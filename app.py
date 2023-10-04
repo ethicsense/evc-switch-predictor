@@ -1,12 +1,12 @@
 import gradio as gr
 import os
 import cv2
-import model_selector
+import model_manager as mm
 import argparse
 
 
 def get_model(model_type, model_name):
-    mg =  model_selector.model_generator(model_type, model_name)
+    mg =  mm.model_generator(model_type, model_name)
     model = mg.get_model()
     if model:
         out = "Success"
@@ -16,14 +16,15 @@ def get_model(model_type, model_name):
     return out, model
 
 
-
-def get_weights(f):
+def new_weights(f):
 
     return f
 
 
-def run_model():
-    pass
+def run_model(video, model):
+    output_video = model.predict(video, model)
+    
+    return output_video
 
 
 
@@ -45,7 +46,7 @@ if __name__ == "__main__":
     with gr.Blocks() as demo:
         radio = gr.Radio(label="Model Class", choices=["ResNet", "EfficientNet", "MobileNet", "YOLOv8"])
         model_list = gr.Dropdown(label="Models Available", choices=[], interactive=True)
-        w_list = os.listdir("weights/")
+        w_list = os.listdir("weights")
         model_map = {
             "YOLOv8" : w_list
         }
@@ -65,9 +66,27 @@ if __name__ == "__main__":
             txt1 = gr.Textbox(label="Done or Not")
             txt2 = gr.TextArea(label="Model Information")
 
-        b1.click(get_model, inputs=[radio, model_list], outputs=[txt1, txt2])
-
         b2 = gr.Button(value="Start Prediction")
+
+        with gr.Row() as output_row:
+            inp_video = gr.Video()
+            out_video = gr.Video()
+
+        def submit_pred(radio, model_list, inp_video):
+            tmp, model = get_model(radio, model_list)
+            del tmp
+            output = mm.predict(inp_video, model)
+
+            return output
+
+
+        b1.click(get_model, inputs=[radio, model_list], outputs=[txt1, txt2])
+        b2.click(
+            submit_pred,
+            [radio, model_list, inp_video],
+            out_video
+        )
+
 
 
 
