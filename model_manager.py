@@ -2,6 +2,7 @@ import torch
 import os
 from ultralytics import YOLO
 import cv2
+import datetime
 
 class model_generator:
 
@@ -78,3 +79,38 @@ def predict(video, model):
     out.release()
 
     return output_file
+
+
+# def stream_infer(url, model):
+
+#     currenttime = datetime.datetime.now()
+#     video_capture = cv2.VideoCapture(url)
+    
+#     video_capture.set(3, 120)
+#     video_capture.set(4, 120)
+#     fps = 30.0
+
+#     streaming_window_width = int(video_capture.get(3))
+#     streaming_window_height = int(video_capture.get(4))
+
+#     filename = str(currenttime.strftime('%Y %m %d %H %M %S'))
+#     path = os.getcwd() + "/stream/" + f"{filename}.mp4"
+
+#     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+#     out = cv2.VideoWriter(path, fourcc, fps, (streaming_window_width, streaming_window_height))
+
+#     iterating, frame = video_capture.read()
+#     while iterating:
+#         results = model(frame)
+#         annotated_frame = results[0].plot()
+
+#         out.write(annotated_frame)
+#         yield annotated_frame, None
+
+#         iterating, frame = video_capture.read()
+
+#         if cv2.waitKey(1) & 0xff == ord('q'):
+#             break
+
+#     video_capture.release()
+#     yield annotated_frame, path

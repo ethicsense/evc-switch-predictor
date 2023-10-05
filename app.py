@@ -3,6 +3,7 @@ import os
 import cv2
 import model_manager as mm
 import argparse
+import datetime
 
 
 def get_model(model_type, model_name):
@@ -44,7 +45,7 @@ if __name__ == "__main__":
 
 
     with gr.Blocks() as demo:
-        radio = gr.Radio(label="Model Class", choices=["ResNet", "EfficientNet", "MobileNet", "YOLOv8"])
+        radio = gr.Radio(label="Model Class", choices=["YOLOv8"])
         model_list = gr.Dropdown(label="Models Available", choices=[], interactive=True)
         w_list = os.listdir("weights")
         model_map = {
@@ -66,30 +67,70 @@ if __name__ == "__main__":
             txt1 = gr.Textbox(label="Done or Not")
             txt2 = gr.TextArea(label="Model Information")
 
+        mode = gr.Radio(label="Select Mode", choices=["video", "stream"])
+        url = gr.Textbox(label="enter RTSP url")
         b2 = gr.Button(value="Start Prediction")
 
+        out_frames = gr.Image(label="last frame")
         with gr.Row() as output_row:
-            inp_video = gr.Video()
             out_video = gr.Video()
 
         def submit_pred(radio, model_list, inp_video):
             tmp, model = get_model(radio, model_list)
             del tmp
-            output = mm.predict(inp_video, model)
+            output = mm.predict(inp_video, model, mode)
 
             return output
+
+        def stream_infer(radio, model_list, url):
+            tmp, model = get_model(radio, model_list)
+            del tmp
+
+            currenttime = datetime.datetime.now()
+            video_capture = cv2.VideoCapture(url)
+            
+            video_capture.set(3, 240)
+            video_capture.set(4, 240)
+            fps = 30.0
+
+            streaming_window_width = int(video_capture.get(3))
+            streaming_window_height = int(video_capture.get(4))
+
+            filename = str(currenttime.strftime('%Y %m %d %H %M %S'))
+            path = os.getcwd() + "/stream/" + f"{filename}.mp4"
+
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(path, fourcc, fps, (streaming_window_width, streaming_window_height))
+
+            iterating, frame = video_capture.read()
+            while iterating:
+                results = model(frame)
+                annotated_frame = results[0].plot()
+                annotated_frame = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
+
+                out.write(annotated_frame)
+                yield annotated_frame, None
+
+                iterating, frame = video_capture.read()
+
+                if cv2.waitKey(1) & 0xff == ord('q'):
+                    break
+
+            video_capture.release()
+            yield annotated_frame, path
+
 
 
         b1.click(get_model, inputs=[radio, model_list], outputs=[txt1, txt2])
         b2.click(
-            submit_pred,
-            [radio, model_list, inp_video],
-            out_video
+            stream_infer,
+            [radio, model_list, url],
+            [out_frames, out_video]
         )
 
 
 
-
+    demo. queue()
     demo.launch(
         server_name=args.server_name,
         server_port=args.server_port,
