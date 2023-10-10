@@ -4,6 +4,8 @@ import cv2
 import model_manager as mm
 import argparse
 import datetime
+import numpy as np
+from PIL import Image
 
 
 def get_model(model_type, model_name):
@@ -55,7 +57,7 @@ if __name__ == "__main__":
         def filter_models(choice):
             if choice in model_map.keys():
                 return gr.Dropdown(
-                    choices=model_map[choice], value=model_map[choice][1]
+                    choices=model_map[choice], value=model_map[choice][2]
                 )
             else:
                 return gr.Dropdown(visible=False)
@@ -68,10 +70,17 @@ if __name__ == "__main__":
             txt2 = gr.TextArea(label="Model Information")
 
         mode = gr.Radio(label="Select Mode", choices=["video", "stream"])
-        url = gr.Textbox(label="enter RTSP url")
+        url = gr.Textbox(
+            label="enter RTSP url",
+            value="rtsp://user1:ketiabcs@evc.re.kr:39091/h264Preview_01_main"
+        )
         b2 = gr.Button(value="Start Prediction")
 
-        out_frames = gr.Image(label="last frame")
+        out_frames = gr.Image(
+            label="last frame",
+            source="webcam",
+            streaming=True
+        )
         with gr.Row() as output_row:
             out_video = gr.Video()
 
@@ -89,9 +98,9 @@ if __name__ == "__main__":
             currenttime = datetime.datetime.now()
             video_capture = cv2.VideoCapture(url)
             
-            video_capture.set(3, 240)
-            video_capture.set(4, 240)
-            fps = 30.0
+            video_capture.set(3, 100)
+            video_capture.set(4, 100)
+            fps = int(video_capture.get(cv2.CAP_PROP_FPS))
 
             streaming_window_width = int(video_capture.get(3))
             streaming_window_height = int(video_capture.get(4))
@@ -103,22 +112,26 @@ if __name__ == "__main__":
             out = cv2.VideoWriter(path, fourcc, fps, (streaming_window_width, streaming_window_height))
 
             iterating, frame = video_capture.read()
+            frame_cnt = 0
+            imgs_np_list = []
+
             while iterating:
                 results = model(frame)
+                frame_cnt += 1
                 annotated_frame = results[0].plot()
                 annotated_frame = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
-
                 out.write(annotated_frame)
-                yield annotated_frame, None
+                imgs_np_list.append(annotated_frame)
+
+                if frame_cnt >= 30:
+                    for i in imgs_np_list[-30:] :
+                        yield i, None
+                        frame_cnt = 0
 
                 iterating, frame = video_capture.read()
 
-                if cv2.waitKey(1) & 0xff == ord('q'):
-                    break
-
             video_capture.release()
             yield annotated_frame, path
-
 
 
         b1.click(get_model, inputs=[radio, model_list], outputs=[txt1, txt2])
@@ -130,9 +143,9 @@ if __name__ == "__main__":
 
 
 
-    demo. queue()
+    demo.queue()
     demo.launch(
         server_name=args.server_name,
         server_port=args.server_port,
-        debug=True
+        debug=True,
     )

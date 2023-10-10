@@ -1,3 +1,4 @@
 # ignore media data outputs
 video/
 stream/
+image/
